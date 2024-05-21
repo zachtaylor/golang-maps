@@ -29,13 +29,17 @@ func (o *Observable[K, V]) callback(key K, new, old V) {
 		o.Observe(key, new, old)
 	}
 }
+func (o *Observable[K, V]) set(key K, val V) {
+	o.callback(key, val, o.sync.data[key])
+	o.sync.data[key] = val
+}
 
 // Keys returns the keys
 func (o *Observable[K, V]) Keys() []K {
 	return o.sync.Keys()
 }
 
-// Keys returns the values
+// Values returns the values
 func (o *Observable[K, V]) Values() []V {
 	return o.sync.Values()
 }
@@ -53,8 +57,7 @@ func (o *Observable[K, V]) Get(key K) V {
 // Set changes the value for a key
 func (o *Observable[K, V]) Set(key K, val V) {
 	o.sync.rw.Lock()
-	o.callback(key, val, o.sync.data[key])
-	o.sync.data[key] = val
+	o.set(key, val)
 	o.sync.rw.Unlock()
 }
 
@@ -107,12 +110,12 @@ func (o *Observable[K, V]) DeleteFunc(del func(K, V) bool) {
 	o.sync.rw.Unlock()
 }
 
-// WithLock calls a function inside the RWMutex write lock state
-func (o *Observable[K, V]) WithLock(f func()) {
-	o.sync.WithLock(f)
+// Lock calls a function inside the RWMutex write lock state
+func (o *Observable[K, V]) Lock(f func(set func(K, V))) {
+	o.sync.rw.Lock()
+	f(o.set)
+	o.sync.rw.Unlock()
 }
 
-// WithRLock calls a function inside the RWMutex read lock state
-func (o *Observable[K, V]) WithRLock(f func()) {
-	o.sync.WithRLock(f)
-}
+// RLock calls a function inside the RWMutex read lock state
+func (o *Observable[K, V]) RLock(f func()) { o.sync.RLock(f) }

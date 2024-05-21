@@ -27,7 +27,7 @@ func (s *Sync[K, V]) Keys() []K {
 	return keys
 }
 
-// Keys returns the values
+// Values returns the values
 func (s *Sync[K, V]) Values() []V {
 	s.rw.RLock()
 	i, values := 0, make([]V, len(s.data))
@@ -48,8 +48,12 @@ func (s *Sync[K, V]) Get(key K) V { return s.data[key] }
 // Set changes the value for a key
 func (s *Sync[K, V]) Set(key K, val V) {
 	s.rw.Lock()
-	s.data[key] = val
+	s.set(key, val)
 	s.rw.Unlock()
+}
+
+func (s *Sync[K, V]) set(key K, val V) {
+	s.data[key] = val
 }
 
 // Clone returns a shallow clone of a map
@@ -89,15 +93,14 @@ func (s *Sync[K, V]) Filter(f func(K, V) bool) map[K]V {
 }
 
 // Find uses a test func to find the first passing value
-func (s *Sync[K, V]) Find(f func(K, V) bool) (key K, val V) {
+func (s *Sync[K, V]) Find(f func(K, V) bool) (_ K, _ V) {
 	s.rw.RLock()
+	defer s.rw.RUnlock()
 	for k, v := range s.data {
 		if f(k, v) {
-			key, val = k, v
-			break
+			return k, v
 		}
 	}
-	s.rw.RUnlock()
 	return
 }
 
@@ -134,15 +137,15 @@ func (s *Sync[K, V]) DeleteFunc(del func(K, V) bool) {
 	s.rw.Unlock()
 }
 
-// WithLock calls a function inside the RWMutex write lock state
-func (s *Sync[K, V]) WithLock(f func()) {
+// Lock calls a function inside the RWMutex write lock state
+func (s *Sync[K, V]) Lock(f func(set func(K, V))) {
 	s.rw.Lock()
-	f()
+	f(s.set)
 	s.rw.Unlock()
 }
 
-// WithRLock calls a function inside the RWMutex read lock state
-func (s *Sync[K, V]) WithRLock(f func()) {
+// RLock calls a function inside the RWMutex read lock state
+func (s *Sync[K, V]) RLock(f func()) {
 	s.rw.RLock()
 	f()
 	s.rw.RUnlock()
